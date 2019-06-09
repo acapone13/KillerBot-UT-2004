@@ -156,7 +156,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     
     private static int instanceCount = 0;
     
-    private State state = State.SEARCH;;
+    private State state = State.SEARCH;
 
     /**
      * Bot's preparation - called before the bot is connected to GB2004 and

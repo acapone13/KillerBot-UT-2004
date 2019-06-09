@@ -10,12 +10,15 @@ public class Sarsa {
 
     // Possible states 
     private int states;
+
     // Possible actions
     private int actions;
+
     // Q-values
     private double[][] qvalues;
+
     // Exploration policy
-    private IExplotarionPolicy explorationPolicy;
+    private ExplorationPolicy explorationPolicy;
 
     // Discount factor
     private double discountFactor = 0.95;
@@ -42,7 +45,7 @@ public class Sarsa {
     *  Exploration policy
     *  @return Exploration policy
     */
-    public IExplotarionPolicy getExplorationPolicy() {
+    public ExplorationPolicy getExplorationPolicy() {
         return explorationPolicy;
     }
 
@@ -51,7 +54,7 @@ public class Sarsa {
     *  Policy, which is used to select actions.
     *  @param explorationPolicy Exploration policy
     */
-    public void setExplorationPolicy(IExplotarionPolicy explorationPolicy) {
+    public void setExplorationPolicy(ExplorationPolicy explorationPolicy) {
         this.explorationPolicy = explorationPolicy;
     }
 
@@ -91,7 +94,7 @@ public class Sarsa {
     *  estimates update.
     *  @param discountFactor Discount Factor
     */
-    public double setDiscountFactor(double discountFactor) {
+    public void setDiscountFactor(double discountFactor) {
         this.discountFactor = Math.max(0.0, Math.min(1.0, discountFactor));
     }
 
@@ -106,7 +109,7 @@ public class Sarsa {
     *  with small values or not. Randomization of action values may be useful, when greedy exploration
     *  policies are used. In this case randomization ensures that actions of the same type are not chosen always.
     */
-    public Sarsa(int states, int actions, IExplotarionPolicy explorationPolicy, boolean randomize) {
+    public Sarsa(int states, int actions, ExplorationPolicy explorationPolicy, boolean randomize) {
         this.states = states;
         this.actions = actions;
         this.explorationPolicy = explorationPolicy;
@@ -122,7 +125,7 @@ public class Sarsa {
             Random r = new Random( );
             for (int i = 0; i < states; i++){
                 for (int j = 0; j < actions; j++){
-                    qvalues[i][j] = r.nexDouble()/10;
+                    qvalues[i][j] = r.nextDouble()/10;
                 }
             }
         }
@@ -134,7 +137,7 @@ public class Sarsa {
     * @return Returns the action for the state.
     */
     public int getAction(int state) {
-        return IExplotarionPolicy.ChooseAction(qvalues[state]);
+        return explorationPolicy.ChooseAction(qvalues[state]);
     }
 
     /**
