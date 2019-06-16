@@ -9,21 +9,34 @@ import java.util.Random;
 public class Sarsa {
 
     // Possible states 
-    private int states;
+    private int states; //5
+
+    // Previous state
+    private int state;
 
     // Possible actions
-    private int actions;
+    private int actions; //8
+
+    // Previous action
+    private int action;
 
     // Q-values
     private double[][] qvalues;
 
-    // Exploration policy
+    // Frequency table
+    private double[][] N;
+
+    // Exploration policy (Epsilon)
     private ExplorationPolicy explorationPolicy;
 
-    // Discount factor
-    private double discountFactor = 0.95;
-    // Learning rate
-    private double learningRate = 0.25;
+    // Discount factor (Gamma)
+    private double discountFactor; // 0.95
+
+    // Learning rate (alpha)
+    private double learningRate; // 0.25
+
+    // Reward
+    private double reward;
 
     /** 
     *  Amount of possible states
@@ -115,17 +128,20 @@ public class Sarsa {
         this.explorationPolicy = explorationPolicy;
 
         // Create Q-Array
-        qvalues = new double[states][];
+        /*qvalues = new double[states][];
         for (int i = 0; i < states; i++){
             qvalues[i] = new double[actions];
-        }
+        }*/
+
+        this.qvalues = new double[states][actions];
+        this.N = new double[states][actions];
 
         // Randomize
         if (randomize){
             Random r = new Random( );
             for (int i = 0; i < states; i++){
                 for (int j = 0; j < actions; j++){
-                    qvalues[i][j] = r.nextDouble()/10;
+                    this.qvalues[i][j] = r.nextDouble()/10;
                 }
             }
         }
@@ -140,6 +156,14 @@ public class Sarsa {
         return explorationPolicy.ChooseAction(qvalues[state]);
     }
 
+    public void setAction(int action){
+        this.action = action;
+    }
+
+    public void setState(int state){
+        this.state = state;
+    }
+
     /**
     * Update Q-function's value for the previous state-action pair.
     * @param previousState Current state.
@@ -148,30 +172,21 @@ public class Sarsa {
     * @param nextState Next state.
     * @param nextAction Next action.
     */
-    public void UpdateState(int previousState, int previousAction, double reward, int nextState, int nextAction){
-        // Previous state's action estimations
-        double[] previousActionEstimations = qvalues[previousState];
-        // update reward of the previous state
-        previousActionEstimations[previousAction] *= (1.0 - learningRate);
-        previousActionEstimations[previousAction] += (learningRate * (reward + discountFactor*qvalues[nextState][nextAction]));
-    }
+    public int learn(double nextReward, int nextState){
+        int nextAction = getAction(nextState);
+        if (this.state == 4){
+            qvalues[this.state][this.action] = nextReward;
+        }
+        if (this.state != 0 ){
+            this.N[this.state][this.action] += 1;
+            this.qvalues[this.state][this.action] += learningRate*(this.N[this.state][this.action])*(this.reward + discountFactor*(this.qvalues[nextState][nextAction] - this.qvalues[this.state][this.action]));
+        }
+        this.state = nextState;
+        this.action = nextAction;
+        this.reward = nextReward;
 
-    /**
-    * Update Q-function's value for the previous state-action pair.
-    * @param previousState Current state.
-    * @param previousAction Action, which lead from previous to the next state.
-    * @param reward Reward value, received by taking specified action from previous state.
-    * 
-    * Updates Q-function's value for the previous state-action pair in
-    * the case if the next state is terminal.
-    */
-    public void UpdateState(int previousState, int previousAction, double reward) {
-        // previous state's action estimations
-        double[] previousActionEstimations = qvalues[previousState];
-        // update expexted summary reward of the previous state
-        previousActionEstimations[previousAction] *= ( 1.0 - learningRate );
-        previousActionEstimations[previousAction] += ( learningRate * reward );
-    }
+        return this.action;
+    } 
     
 }
 

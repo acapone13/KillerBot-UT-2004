@@ -117,7 +117,8 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
    
             
     @JProp
-    public double weights[] = {0,0,0,0,0,0,0,0}; // Weights list
+    public boolean deadPlayer = false;
+    /*public double weights[] = {0,0,0,0,0,0,0,0}; // Weights list*/
     
     
     /**
@@ -137,6 +138,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         if (enemy.getId().equals(event.getId())) {
             enemy = null;
         }
+
     }
     /**
      * Used internally to maintain the information about the bot we're currently
@@ -155,12 +157,24 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     private UT2004PathAutoFixer autoFixer;
     
     private static int instanceCount = 0;
-    
-    private State state = State.SEARCH;
+
+    public enum States {ATTACK, SEARCH, IDLE, HURT, DEAD};
+
+    public States state;
+
+    public enum Actions {newEnemy, Shoot, runTowards, search, Medkit, Hide, Idle};
+
+    public Actions action;
+
+    public EpsilonGreedyExploration greedyExplore;
+
+    public double reward = 0;
+
+    public Sarsa sarsa = new Sarsa(States.values().length, Actions.values().length, greedyExplore,true);
 
     /**
      * Bot's preparation - called before the bot is connected to GB2004 and
-     * launched into UT2004.
+     * launched into UT2004.S
      */
     @Override
     public void prepareBot(UT2004Bot bot) {
@@ -222,29 +236,96 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         enemy = null;
         navigation.stopNavigation();
         itemsToRunAround = null;
+
+        // Reset state and action to restart
+        state = States.SEARCH;
+        sarsa.setState(state.ordinal());
+        action = Actions.values()[sarsa.getAction(state.ordinal())];
+        sarsa.setAction(action.ordinal());
     }
     
     /**
      * Score chart recompensation
      */
-    protected void rewardUpdate(int initialHealth, int finalHealth, boolean dead, int index) {
+    /*protected double rewardUpdate(int initialHealth, int finalHealth, boolean dead) {
 
-        double reward = 200-(initialHealth-finalHealth);
-        double punishment = -200+(200-initialHealth);
+        double reward = 0; // = 200-(initialHealth-finalHealth);
+        //double punishment = -200+(200-initialHealth);
         if(dead == true){
-            weights[index] = weights[index] + punishment;
+            reward = -100;
         }
-        else{
-            weights[index] = weights[index] + reward;
+        else if (deadPlayer){
+            reward = 100;
+        }
+        else {
+            reward = 0;
+        }
+        return reward;
+    }*/
+
+    public void update(){
+        // Define nextState and nextAction
+        States nextState;
+
+        // Define next State with bot perceptions and update rewards
+        if ((this.shouldEngage && this.getPlayers().canSeeEnemies() && this.getWeaponry().hasLoadedWeapon()) || this.getSenses().isBeingDamaged()) {
+            nextState = States.ATTACK;
+            reward = 100;
+        }
+        else if (this.shouldCollectHealth && this.getInfo().getHealth() < this.healthLevel) {
+            nextState = States.HURT;
+            reward = 0;
+        }
+        else if (this.enemy != null && this.shouldPursue && this.getWeaponry().hasLoadedWeapon()){
+            nextState = States.SEARCH;
+            reward = 25;
+        }
+        else if (deadPlayer){
+            nextState = States.DEAD;
+            reward = -100;
+        }
+        else {
+            nextState = States.IDLE;
+            reward = 0;
+        }
+
+        // Learn and update state and action with next action and next state
+        action = Actions.values()[sarsa.learn(reward, nextState.ordinal())];
+        sarsa.setAction(action.ordinal());
+        sarsa.setState(nextState.ordinal());
+        
+        // newEnemy, Shoot, runTowards, search, Medkit, Hide, Idle
+        switch(action){
+            case newEnemy:
+                pickEnemy();
+                break;
+            case Shoot:
+                shoot();
+                break;
+            case runTowards:
+                followEnemy();
+                break;
+            case search:
+                searchAndPursue();
+                break;
+            case Medkit:
+                getMedkit();
+                break;
+            case Hide:
+                runForLife();
+                break;
+            case Idle:
+                getItem();
+                break;
         }
     }
-    
+
     @EventListener(eventClass = PlayerDamaged.class)
     public void playerDamaged(PlayerDamaged event) {
     	log.info("I have just hurt other bot for: " + event.getDamageType() + "[" + event.getDamage() + "]");
     }
     
-    @EventListener(eventClass=BotDamaged.class)
+    @EventListener(eventClass = BotDamaged.class)
     public void botDamaged(BotDamaged event) {
     	log.info("I have just been hurt by other bot for: " + event.getDamageType() + "[" + event.getDamage() + "]");
     }
@@ -264,14 +345,13 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
             score++;
             for ( int i = 0; i < 8; i++){
                 if(weaponry.getCurrentWeapon().getType().getGroup() == weaponList[i].getGroup()){
-                    rewardUpdate( debutHealth, info.getHealth(), true, i);
+                    //rewardUpdate( debutHealth, info.getHealth(), true, i);
                     test=false;
                     break;
                 }
             }  
         }
-        
-        state = state.currState(this);
+        update();
     }
 
     //////////////////
@@ -285,13 +365,11 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
      * <li> otherwise - stand still (kind a silly, right? :-)
      * </ol>
      */
-    protected void stateAttack() {
+    protected void pickEnemy() {
         if (test == false){
             test= true;
             debutHealth = info.getHealth();
         }
-        boolean shooting = false;
-        double distance = Double.MAX_VALUE;
         pursueCount = 0;
 
         // 1) pick new enemy if the old one has been lost
@@ -311,7 +389,11 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
                 return;
             }
         }
+    }
 
+    protected void shoot(){
+        boolean shooting = false;
+        double distance = Double.MAX_VALUE;
         // 2) stop shooting if enemy is not visible
         if (!enemy.isVisible()){
             if (info.isShooting() || info.isSecondaryShooting()) {
@@ -335,7 +417,11 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
                 }
             }    
         }
+    }
 
+    protected void followEnemy(){
+        boolean shooting = false;
+        double distance = Double.MAX_VALUE;
         // 3) if enemy is far or not visible - run to him
         int decentDistance = Math.round(random.nextFloat() * 800) + 200;
         if (!enemy.isVisible() || !shooting || decentDistance < distance) {
@@ -349,9 +435,10 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
             runningToPlayer = false;
             navigation.stopNavigation();
         }
-        
+
         item = null;
     }
+           
     //////////////////
     // STATE SEARCH //
     //////////////////
@@ -362,12 +449,11 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
      * to null - bot would have seen him before or lost him once for all </ol>
      */
     
-    protected void stateSearch() {
+    protected void searchAndPursue() {
         log.info("Decision is: Search and Pursue");
         ++pursueCount;
         if (pursueCount > 30) {
-            reset();
-            
+            reset();  
         }
         if (enemy != null) {
         	bot.getBotName().setInfo("Search/Pursue");
@@ -381,22 +467,25 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     protected int pursueCount = 0;
 
     //////////////////
-    // STATE HURT //
+    // STATE HURT   //
     //////////////////
-    protected void stateHurt() {
+    protected void getMedkit() {
+        // 1) Heal by getting Medkit
         log.info("Decision is: MEDKIT");
         Item item = items.getPathNearestSpawnedItem(ItemType.Category.HEALTH);
         //log.info( info.getHealt());
         if (item == null) {
         	log.warning("NO HEALTH ITEM TO RUN TO => ITEMS");
-        	stateIdle();
+        	//getItem();
         } else {
         	bot.getBotName().setInfo("MEDKIT");
         	navigation.navigate(item);
                 this.item = item;
         }
-        
-        // 3) if enemy is far or not visible - run in the opposite direction
+    }
+    
+    protected void runForLife(){
+        // 2) if enemy is far or not visible - run in the opposite direction
         if (!players.canSeeEnemies() && shouldEscape) {
             NavPoint targetNavPoint = this.getNavPoints().getRandomNavPoint();
             if (navigation.isNavigating()){
@@ -414,7 +503,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     ////////////////
     protected List<Item> itemsToRunAround = null;
 
-    protected void stateIdle() {
+    protected void getItem() {
         if (navigation.isNavigatingToItem()) return;
         
         List<Item> interesting = new ArrayList<Item>();
@@ -436,9 +525,6 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         
         Item item = MyCollections.getRandom(tabooItems.filter(interesting));
         if (item == null) {  
-                for(int i = 0; i<8; i++){
-                    log.info(" Tab : " + weaponList[i].getGroup().toString() + " : " + String.valueOf(weights[i]));
-                }
                 log.info("Bot weapon : " + weaponry.getCurrentWeapon().getType().getGroup().toString());
         	log.warning("NO ITEM TO RUN FOR!");
         	if (navigation.isNavigating()) return;
@@ -457,9 +543,9 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     ////////////////
     @Override
     public void botKilled(BotKilled event) {
+        deadPlayer = true;
         for (int i = 0; i<8; i++){
             if(weaponList[i].getName().toUpperCase().equals(players.getPlayer(event.getKiller()).getWeapon().toUpperCase()+"PICKUP") || ("XWEAPONS."+weaponList[i].getGroup().getName().toUpperCase()).equals(players.getPlayer(event.getKiller()).getWeapon().toUpperCase())){
-                rewardUpdate(debutHealth, 0, true, i); 
                 test = false;
                 break;
             }
