@@ -237,6 +237,10 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         navigation.stopNavigation();
         itemsToRunAround = null;
 
+        // Set Discount Factor and Learning Rate
+        sarsa.setDiscountFactor(0.95);
+        sarsa.setLearningRate(0.25);
+
         // Reset state and action to restart
         state = States.SEARCH;
         sarsa.setState(state.ordinal());
