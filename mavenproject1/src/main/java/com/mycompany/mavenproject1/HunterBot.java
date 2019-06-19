@@ -41,7 +41,7 @@ import cz.cuni.amis.pogamut.ut2004.utils.UT2004BotRunner;
 import cz.cuni.amis.utils.collections.MyCollections;
 import cz.cuni.amis.utils.exception.PogamutException;
 import cz.cuni.amis.utils.flag.FlagListener;
-import com.mycompany.mavenproject1.KillerBot;
+import com.mycompany.mavenproject1.HunterBot;
 
 
 /**
@@ -53,7 +53,7 @@ import com.mycompany.mavenproject1.KillerBot;
  */
 
 @AgentScoped
-public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
+public class HunterBot extends UT2004BotModuleController<UT2004Bot> {
     
     @JProp
     public int debutHealth = 100; //Bot's health at the attack state debut
@@ -198,7 +198,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         weaponPrefs.addGeneralPref(UT2004ItemType.LINK_GUN, true);
         weaponPrefs.addGeneralPref(UT2004ItemType.ASSAULT_RIFLE, true);
         weaponPrefs.addGeneralPref(UT2004ItemType.BIO_RIFLE, true); 
-        weaponPrefs.addGeneralPref(UT2004ItemType.ONS_AVRIL, true); //Anti-vehicule Weapon
+        weaponPrefs.addGeneralPref(UT2004ItemType.ONS_AVRIL, true);
     }
 
     /**
@@ -261,15 +261,15 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     @Override
     public void logic() {   
         if(score+1 == stats.getKilledOthers()){
-            score++;
-            for ( int i = 0; i < 8; i++){
-                if(weaponry.getCurrentWeapon().getType().getGroup() == weaponList[i].getGroup()){
-                    rewardUpdate( debutHealth, info.getHealth(), true, i);
-                    test=false;
-                    break;
+                    score++;
+                    for ( int i = 0; i < 8; i++){
+                        if(weaponry.getCurrentWeapon().getType().getGroup() == weaponList[i].getGroup()){
+                            rewardUpdate( debutHealth, info.getHealth(), true, i);
+                            test=false;
+                            break;
+                        }
+                    }  
                 }
-            }  
-        }
         
         state = state.currState(this);
     }
@@ -286,7 +286,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
      * </ol>
      */
     protected void stateAttack() {
-        if (test == false){
+        if (test==false){
             test= true;
             debutHealth = info.getHealth();
         }
@@ -399,13 +399,12 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         // 3) if enemy is far or not visible - run in the opposite direction
         if (!players.canSeeEnemies() && shouldEscape) {
             NavPoint targetNavPoint = this.getNavPoints().getRandomNavPoint();
-            if (navigation.isNavigating()){
+            if (navigation.isNavigating())
                 navigation.stopNavigation();
-            }
             getAct().act(new Rotate().setAmount(32500));
             navigation.navigate(targetNavPoint);
-            log.info("Running away!");
-            //shouldEscape = false;
+            log.info("Running away!!!");
+            shouldEscape = false;
         }
     }
 
@@ -435,7 +434,8 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         }
         
         Item item = MyCollections.getRandom(tabooItems.filter(interesting));
-        if (item == null) {  
+        if (item == null) {
+              //Fonction d'utilisation du tableau et des poids  
                 for(int i = 0; i<8; i++){
                     log.info(" Tab : " + weaponList[i].getGroup().toString() + " : " + String.valueOf(weights[i]));
                 }
@@ -460,7 +460,7 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
         for (int i = 0; i<8; i++){
             if(weaponList[i].getName().toUpperCase().equals(players.getPlayer(event.getKiller()).getWeapon().toUpperCase()+"PICKUP") || ("XWEAPONS."+weaponList[i].getGroup().getName().toUpperCase()).equals(players.getPlayer(event.getKiller()).getWeapon().toUpperCase())){
                 rewardUpdate(debutHealth, 0, true, i); 
-                test = false;
+                test=false;
                 break;
             }
         }
@@ -471,6 +471,6 @@ public class KillerBot extends UT2004BotModuleController<UT2004Bot> {
     public static void main(String args[]) throws PogamutException {
         // starts 3 Hunters at once
         // note that this is the most easy way to get a bunch of (the same) bots running at the same time        
-    	new UT2004BotRunner(KillerBot.class, "Hunter").setMain(true).setLogLevel(Level.INFO).startAgents(1);
+    	new UT2004BotRunner(HunterBot.class, "Hunter").setMain(true).setLogLevel(Level.INFO).startAgents(1);
     }
 }

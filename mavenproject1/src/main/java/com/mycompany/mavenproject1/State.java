@@ -27,43 +27,35 @@ public enum State {
     ATTACK {
         @Override
         public State currState(KillerBot bot){
-            bot.reward = 100;
-            return update(bot);
+            bot.stateAttack();
+            return nextState(bot);
         }
     },
     HURT {
         @Override 
         public State currState(KillerBot bot){
-            bot.reward = -25;
-            return update(bot);
+            bot.stateHurt();
+            return nextState(bot);
         }
     },
     SEARCH {
         @Override
         public State currState(KillerBot bot){
-            bot.reward = 50;
-            return update(bot);
+            bot.stateSearch();
+            return nextState(bot);
         }
     },
     IDLE {
         @Override
         public State currState(KillerBot bot){
-            bot.reward = 0;
-            return update(bot);
-        }
-    },
-    DEAD {
-        @Override
-        public State currState(KillerBot bot){
-            bot.reward = -200;
-            return update(bot);
+            bot.stateIdle();
+            return nextState(bot);
         }
     };
     
     public abstract State currState(KillerBot bot);
     
-    public State update(KillerBot bot) {
-        // Old Bot
+    public State nextState(KillerBot bot) {
         if ((bot.shouldEngage && bot.getPlayers().canSeeEnemies() && bot.getWeaponry().hasLoadedWeapon()) || bot.getSenses().isBeingDamaged()) {
             return ATTACK;
         }
@@ -76,5 +68,6 @@ public enum State {
         else {
             return IDLE;
         }
+        
     }
 }
